@@ -1,6 +1,6 @@
 # betaFlight — gray
 
-Updated: 2026-05-14T09:04:58Z
+Updated: 2026-05-14T09:06:44Z
 Health: gray
 Idle
 

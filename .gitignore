@@ -67,3 +67,17 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# wiki
+/wikival/.obsidian/
+/wikival/.raw/
+/wikival/_resman/
+/wikival/.obsidian/workspace.json
+/wikival/.obsidian/workspace-mobile.json
+/wikival/.smart-connections/
+/wikival/.obsidian-git-data
+/wikival/.trash/
+/wikival/.DS_Store
+
+## gits
+betaflight/
