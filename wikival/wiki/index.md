@@ -6,7 +6,7 @@ updated: 2026-05-12
 tags: [meta, index]
 ---
 
-<!-- updated 2026-05-12 — ingested official BF Getting Started Hardware page -->
+<!-- updated 2026-05-14 — autoresearch: MSP protocol controlling Betaflight FW -->
 
 
 # Betaflight Wiki — Master Index
@@ -60,20 +60,47 @@ tags: [meta, index]
 - [[Magnetometer (Compass)]] — concept — developing
 - [[GPS (Position Sensing)]] — concept — developing
 - [[FC Voltage Rails]] — concept — developing
+- [[MSP v2 Frame Format]] — concept — documented
+- [[MSP DisplayPort]] — concept — documented
+- [[MSP API Versioning]] — concept — documented
+- [[MSP over CRSF]] — concept — documented
 
 ### Architecture
-*(none yet)*
+
+**Master source-tree walkthrough** ([[srclatest/_index|srclatest/_index]] — read top-down):
+
+- [[srclatest/01-overview]] — architecture — stable — 5-layer model, gyro-as-heartbeat, PLATFORM/TARGET/CONFIG triaxis
+- [[srclatest/02-directory-layout]] — architecture — stable — `src/main/`, `src/platform/`, `lib/main/` tree
+- [[srclatest/03-build-system]] — architecture — stable — Makefile, `mk/*.mk`, toolchain, outputs
+- [[srclatest/04-boot-and-scheduler]] — architecture — stable — `main()`, 3-phase init, cooperative scheduler
+- [[srclatest/05-flight-core-loop]] — architecture — stable — `taskMainPidLoop` subtask chain, modes, arming
+- [[srclatest/06-flight-modules]] — architecture — stable — `flight/` + `fc/` file inventory
+- [[srclatest/07-hal-and-drivers]] — architecture — stable — HAL pattern, `drivers/` + `sensors/` + platform split
+- [[srclatest/08-io-subsystems]] — architecture — stable — `io/` inventory (serial, VTX, GPS, LED, beeper, …)
+- [[srclatest/09-msp-cli-cms]] — architecture — stable — three config interfaces converging on PGs
+- [[srclatest/10-osd-blackbox-telemetry]] — architecture — stable — OSD elements, logger, downlink telemetry
+- [[srclatest/11-rx-subsystem]] — architecture — stable — serial RX + SPI RX (ExpressLRS, CC2500, …)
+- [[srclatest/12-config-and-pg]] — architecture — stable — Parameter Groups, EEPROM, versioning
+- [[srclatest/13-modification-guide]] — how-to — stable — cookbook: where to edit to change X
 
 ### Configurator
 *(none yet)*
 
 ### Reverse Engineering
 
-- [[MSP Protocol]] — protocol — developing
+- [[MSP Protocol]] — protocol — documented
 - [[Cortex-M Firmware Dumping]] — protocol — documented
 - [[Loading Cortex-M Firmware in Ghidra]] — protocol — documented
 - [[Cortex-M Binary Patching]] — protocol — documented
 - [[Bin to Hex Conversion and Constant Patching]] — protocol — documented
+- [[MSP Commands Reference]] — protocol — stub
+- [[CRSF Protocol]] — protocol — stub
+- [[Blackbox Format]] — protocol — stub
+- [[Bootloader]] — protocol — stub
+- [[EEPROM Layout]] — protocol — stub
+- [[CLI Internals]] — protocol — stub
+- [[OSD Font Format]] — protocol — stub
+- [[Build System RE]] — protocol — stub
 
 ### Entities
 
@@ -111,11 +138,17 @@ tags: [meta, index]
 - [[anvil-glitching-stm32-rdp]] — source — ingested
 - [[svd-loader-h2lab]] — source — ingested
 - [[cjacker-opensource-toolchain-stm32]] — source — ingested
+- [[inav-wiki-msp-v2]] — source — ingested
+- [[betaflight-deepwiki-msp]] — source — ingested
+- [[betaflight-displayport-api]] — source — ingested
+- [[betaflight-msp-protocol-h]] — source — ingested
+- [[betaflight-crsf-protocol-h]] — source — ingested
 
 ### Thesis
 
 - [[Research - STM32F7x2 in Betaflight]] — synthesis — developing
 - [[Research - STM32 Firmware Build and Reverse Engineering]] — synthesis — developing
+- [[Research - MSP Protocol Controlling Betaflight Firmware]] — synthesis — developing
 
 ### Gaps
 *(none yet)*
@@ -124,6 +157,6 @@ tags: [meta, index]
 
 ## Stats
 
-- Total pages: 57
-- Last updated: 2026-05-12
-- Sources ingested: 3 (raw articles) + 18 (autoresearch web sources) = 21
+- Total pages: 75
+- Last updated: 2026-05-14
+- Sources ingested: 3 (raw articles) + 23 (autoresearch web sources) = 26

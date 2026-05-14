@@ -2,13 +2,55 @@
 type: meta
 title: "Operation Log"
 created: 2026-05-12
-updated: 2026-05-12
+updated: 2026-05-14
 tags: [meta, log]
 ---
 
 # Operation Log
 
 Append-only. Newest entries at the top. Format: `## YYYY-MM-DD — Operation`
+
+---
+
+## 2026-05-14 — write | srclatest source-tree walkthrough
+- Trigger: user "read the betaflight latest source code and write me in srclatest a full summary"
+- Source: `/mnt/betab/betaflight/` master submodule, commit `6434dd725` (`4.5.0-1097-g6434dd725`)
+- Created 14 pages under `wiki/srclatest/` totaling ~3,500 lines:
+  - `_index.md` — landing TOC with reading order
+  - `01-overview.md` — 5-layer architecture, gyro-as-heartbeat, PLATFORM/TARGET/CONFIG triaxis
+  - `02-directory-layout.md` — every dir in `src/main/`, `src/platform/`, `lib/main/`
+  - `03-build-system.md` — Makefile + `mk/*.mk` + toolchain + outputs (`.hex`, `.bin`, `.dfu`, `.uf2`, SITL `.exe`, EXST)
+  - `04-boot-and-scheduler.md` — 3-phase init, cooperative scheduler, REALTIME bypass
+  - `05-flight-core-loop.md` — `taskMainPidLoop` 4-subtask chain, RC pipeline, modes, arming flags
+  - `06-flight-modules.md` — inventory of `flight/` (PID, mixer, IMU, GPS rescue, etc.) and `fc/`
+  - `07-hal-and-drivers.md` — abstract `drivers/` ↔ platform-specific `src/platform/*/`, sensor runtime discovery
+  - `08-io-subsystems.md` — `io/` (serial, VTX, GPS, LED, beeper, displayport, dronecan, …)
+  - `09-msp-cli-cms.md` — three config interfaces, all converge on PGs
+  - `10-osd-blackbox-telemetry.md` — OSD elements, blackbox frame types/encoding/backends, telemetry protocols
+  - `11-rx-subsystem.md` — serial RX (SBUS, CRSF, GHST, iBus, SRXL2, …) + SPI RX (ELRS, CC2500, CYRF, A7105, NRF24)
+  - `12-config-and-pg.md` — Parameter Groups, EEPROM layout, FNV dirty tracking, versioning
+  - `13-modification-guide.md` — practical cookbook ("I want to change X → edit file Y")
+- Cross-links to existing reverse-engineering pages: [[MSP Protocol]], [[CRSF Protocol]], [[Blackbox Format]], [[OSD Font Format]], [[EEPROM Layout]], [[MSP Commands Reference]]
+- Source research delegated to 4 parallel Explore agents (build, fc/scheduler, drivers/HAL, msp/cli/cms/osd/blackbox/telemetry/rx/pg).
+- Registered all 14 pages in `wiki/index.md` Architecture section.
+
+## 2026-05-14 — lint | cleaned vault root mess
+- Trigger: user said "i done some mess with pages here, make order"
+- Found: 9 empty `.md` files at `/mnt/betab/wikival/` root (Obsidian auto-created from clicking dead wikilinks in `wiki/reverse/_index.md` and elsewhere).
+- Moved 8 → `wiki/reverse/` with stub frontmatter: [[Blackbox Format]], [[Bootloader]], [[Build System RE]], [[CLI Internals]], [[CRSF Protocol]], [[EEPROM Layout]], [[MSP Commands Reference]], [[OSD Font Format]]
+- Deleted 1 empty duplicate: `Oscar Liang Betaflight 4.4.md` at root (real source exists at `wiki/sources/oscarliang-betaflight-4-4.md`).
+- Updated `wiki/index.md` Reverse Engineering section; page count 67 → 75.
+- Report: [[lint-report-2026-05-14]].
+- Outcome: vault root now clean (only `CLAUDE.md`, `README.md`). 8 previously-dead `[[link]]` references from `wiki/reverse/_index.md` now resolve to stubs.
+
+---
+
+## 2026-05-14 — autoresearch | MSP protocol in Betaflight (controls ST firmware)
+- Rounds: 1 (depth sufficient; gap-fill folded into round 1)
+- Sources fetched: 5
+- Pages created (10): [[MSP v2 Frame Format]], [[MSP DisplayPort]], [[MSP API Versioning]], [[MSP over CRSF]], [[Research - MSP Protocol Controlling Betaflight Firmware]], [[inav-wiki-msp-v2]], [[betaflight-deepwiki-msp]], [[betaflight-displayport-api]], [[betaflight-msp-protocol-h]], [[betaflight-crsf-protocol-h]]
+- Pages updated: [[MSP Protocol]] (status → documented, gaps resolved, cross-links added)
+- Key finding: MSP is the single wire surface for everything except realtime RC — Configurator handshakes on MSP_API_VERSION, gates features by major.minor, batches MSP_SET_* and commits with MSP_EEPROM_WRITE(250) + MSP_REBOOT(68). MSP v2 ($X, 16-bit IDs, crc8_dvb_s2) is the modern frame; MSP_DISPLAYPORT(182) drives digital VTX OSD; CRSF frame types 0x7A/0x7B/0x7C tunnel MSP wirelessly through ELRS.
 
 ---
 

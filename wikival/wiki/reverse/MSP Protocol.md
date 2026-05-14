@@ -1,11 +1,11 @@
 ---
 type: protocol
 title: "MSP Protocol"
-status: developing
+status: documented
 direction: bidirectional
-transport: serial, USB
+transport: serial, USB, CRSF
 created: 2026-05-12
-updated: 2026-05-12
+updated: 2026-05-14
 tags: [protocol, reverse, msp, serial, companion-computer]
 ---
 
@@ -88,14 +88,17 @@ set msp_override_channels_mask = 47   # 0b00101111 = CH1,2,3,4,6
 - [[Companion Computer]] — typical host using this protocol
 - [[Aocoda F460 Stack]] — example hardware running BF with MSP over USB
 
-## Gaps
+## See also
 
-> [!gap] MSP v2 format unverified
-> MSP v2 extends the frame with 16-bit command IDs and 16-bit size. Full frame format not yet documented here.
-
-> [!gap] MSP_ALTITUDE byte layout unverified
-> Claimed: int32 altitude (cm) + int16 vario (cm/s) = 6 bytes. Needs verification against BF source.
+- [[MSP v2 Frame Format]] — `$X` framing, 16-bit IDs, crc8_dvb_s2.
+- [[MSP API Versioning]] — handshake + save flow (EEPROM_WRITE, REBOOT).
+- [[MSP DisplayPort]] — command 182, sub-commands for digital VTX OSD.
+- [[MSP over CRSF]] — wireless tunneling via CRSF frame types 0x7A/0x7B/0x7C.
+- [[Research - MSP Protocol Controlling Betaflight Firmware]] — full synthesis.
 
 ## Sources
 
 - [[FPV Autonomous Operation with Betaflight and Raspberry Pi]]
+- [[inav-wiki-msp-v2]]
+- [[betaflight-msp-protocol-h]]
+- [[betaflight-deepwiki-msp]]

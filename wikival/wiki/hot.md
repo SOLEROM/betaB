@@ -1,113 +1,122 @@
 ---
 type: meta
 title: "Hot Cache"
-updated: 2026-05-12T00:00:00
+updated: 2026-05-14T00:00:00
 tags: [meta, cache]
 ---
 
 # Recent Context
 
 ## Last Updated
-2026-05-12. **Ingest of official BF Getting Started Hardware page**.
-Filed 1 expanded source + 7 concept pages + 6 entity pages (sensor
-chips). This gives the wiki its first proper "what's on a flight
-controller" coverage beyond the MCU.
+2026-05-14. **Autoresearch: MSP protocol controlling Betaflight firmware.**
+10 new pages filed (4 concepts, 5 sources, 1 synthesis) + the existing
+[[MSP Protocol]] page promoted from `developing` → `documented` with gaps
+resolved. Wiki now has end-to-end coverage of how host tooling
+(Configurator, companion computers, goggles) talks to the FC.
 
 ## Key Recent Facts
 
-- This is a Betaflight research wiki (flight controller firmware for FPV drones)
-- Goal: learn BF inside-out — features, internals, configurator workflow, reverse engineering
+- Betaflight research wiki (flight controller firmware for FPV drones)
+- Goal: learn BF inside-out — features, internals, configurator, RE
 - Mode E (Research) + Mode B (Repository)
 - **Material captured so far**:
-  - Ingests: 3 raw articles (FPV autonomy / RPi; 7" long-range build; BF Getting Started Hardware)
-  - Autoresearch sessions: 2 (STM32F7x2; STM32 build & RE)
+  - Ingests: 3 raw articles
+  - Autoresearch sessions: 3 (STM32F7x2; STM32 build & RE; **MSP protocol**)
 
 ## Key Technical Knowledge
 
-### From This Ingest (BF Getting Started Hardware)
+### From This Autoresearch (MSP Protocol)
 
-**The FC block inventory** (every BF target maps these blocks to MCU pins):
+**MSP is the single wire surface** for everything except realtime RC:
+configuration, telemetry, persistence, reboot, OSD on digital VTX, even
+wireless config tunneling through ExpressLRS.
 
-| Block | Common chip | Bus | Notes |
-|-------|-------------|-----|-------|
-| MCU | F411/G473/F405/AT32F435/F722/F745/H743 | — | "higher number = more powerful" |
-| Voltage regulator | board-specific | — | 3 rails: **3.3 V / 5 V / 9–12 V** |
-| OSD chip (analog only) | [[MAX7456]] / AT7456E | SPI | Skipped on digital VTX |
-| Gyro + Accel (IMU) | [[MPU6000]] / [[BMI270]] / [[ICM-42688-P]] | SPI | 6-axis combo |
-| Barometer | [[BMP280]] / BMP180 / MS5611 / DPS310 | I²C | Hole-in-package; conformal coat kills it |
-| Magnetometer | HMC5883L / IST8310 / LIS3MDL | I²C | EMI-sensitive; **not fully integrated in 4.4.1** |
-| GPS (external) | [[uBlox GPS Module]] M8 / M10 | UART | M10 auto-config from **BF 4.5.0** |
+**Frame formats** ([[MSP v2 Frame Format]]):
+- **V1**: `$M` + dir + size(u8) + cmd(u8) + payload + XOR-sum. Max 255 bytes.
+- **V2**: `$X` + dir + flags(u8) + func(u16-LE) + size(u16-LE) + payload + crc8_dvb_s2. Max 65535 bytes.
+- **Tunneling**: V2 wrapped in V1 frame using cmd=255 (`MSP_V2_FRAME`).
+- CRC: `crc8_dvb_s2`, polynomial **0xD5**, init 0, covers flags onward.
 
-**IMU sample rates** (matters for looptime defaults):
-- MPU6000: 8 kHz
-- BMI270: **3.2 kHz** ← lower; clean signal tradeoff
-- ICM-42688-P: 8 kHz (32 kHz with FIFO), tier-1 since **BF 4.4.1**
+**MSP v2 ID partitioning** ([[betaflight-msp-protocol-h]]):
+- `0x0000–0x00FF` → mirrors V1 commands
+- `0x1000+` → `MSP2_COMMON_*`
+- `0x1F00+` → `MSP2_SENSOR_*`
+- `0x3000+` → `MSP2_BETAFLIGHT_*` (e.g. `MSP2_BETAFLIGHT_BIND = 0x3000`)
 
-**Voltage rails — overloading kills FCs**:
-- 3.3 V → MCU + on-board sensors
-- 5 V → RX, analog cam, low-W VTX, LEDs
-- 12 V (recommended) → digital VTX (DJI O3, Walksnail, HDZero)
+**Configurator handshake** ([[MSP API Versioning]]):
+1. `MSP_API_VERSION(1)` → [proto_ver, major, minor] — drives feature gating
+2. `MSP_FC_VARIANT(2)` → 4-byte ASCII (`BTFL` for Betaflight)
+3. `MSP_FC_VERSION(3)` → [major, minor, patch]
+4. `MSP_BUILD_INFO(5)` → date + time + git short hash
+5. `MSP_BOARD_INFO(4)` → board ID + hw revision
 
-**OSD architectures**:
-- Analog video → MAX7456 chip on FC, SPI from MCU, overlay baked into video before VTX
-- Digital video → no FC chip, MCU sends MSP DisplayPort over UART, goggles overlay
-  - Wins: clean DVR, OSD data export, better fonts
+Current Betaflight API: **1.47** (BF 4.6); 1.46 was BF 4.5.
 
-**Barometer hardware gotchas**:
-- Package port must stay open (no conformal coat over it)
-- Open-cell foam over the chip damps prop-wash pressure spikes
+**Save-settings flow**: `MSP_SET_*` × N → `MSP_EEPROM_WRITE(250)` →
+`MSP_REBOOT(68)`. Both write/reboot abort if armed. EEPROM_WRITE calls
+`writeEEPROM()` then `readEEPROM()` and re-inits VTX table.
 
-**GPS M10 caveat**:
-- BF < 4.5.0: M10 modules need manual u-center config or fix is unreliable
-- BF ≥ 4.5.0: auto-config handles M10 → "just works"
+**MSP_REBOOT variants**: 0 = firmware, 1 = bootloader (DFU), 2 = MSC, 3 = MSC with UTC.
 
-### From Autoresearch #2 (STM32 Build & Reverse Engineering)
+**MSP DisplayPort** ([[MSP DisplayPort]]) — `MSP_DISPLAYPORT(182)`:
+| Sub | Name | Payload |
+|-----|------|---------|
+| 0 | HEARTBEAT | none |
+| 1 | RELEASE | none |
+| 2 | CLEAR_SCREEN | none |
+| 3 | WRITE_STRING | row, col, attr, ASCIIZ ≤30 |
+| 4 | DRAW_SCREEN | none |
+| 5 | OPTIONS | resolution (not used by BF) |
+| 6 | SYS | row, col, system_element_id |
 
-**Forward path — building firmware**
-- Five stages: preprocess → compile (`arm-none-eabi-gcc -c`) → link
-  (`arm-none-eabi-ld` + linker script) → object-copy (`objcopy → .bin/.hex`)
-  → flash.
-- The **linker script** owns the memory layout (`MEMORY` blocks + `SECTIONS`).
-  `KEEP(*(.vectors))` forces the [[Vector Table]] to flash offset 0.
-- BF target binaries are produced by exactly this pipeline (Cloud Build runs
-  it server-side; `make TARGET=STM32F7X2` runs it locally).
+Attribute byte: bit 6 = blink, bits 0-1 = font number (4 × 256 glyphs).
+Repaint loop: `CLEAR_SCREEN → WRITE_STRING* → DRAW_SCREEN` at ~30 Hz.
 
-**Vector table**: `+0x00` = initial MSP, `+0x04` = Reset_Handler. Thumb mode
-function pointer LSB = 1. Moveable via `SCB->VTOR`.
+**MSP over CRSF** ([[MSP over CRSF]]):
+- `CRSF_FRAMETYPE_MSP_REQ` = `0x7A` (request)
+- `CRSF_FRAMETYPE_MSP_RESP` = `0x7B` (58-byte chunks, FC→host)
+- `CRSF_FRAMETYPE_MSP_WRITE` = `0x7C` (8-byte chunks, host→FC — OpenTX limit)
+- Why writes are slow: 8-byte outbound chunks force many CRSF frames per MSP write.
 
-**Reverse path — dumping**: SWD (OpenOCD+ST-Link), USB DFU (`dfu-util`),
-UART (`stm32flash`). First 8 bytes of dump = MSP + Reset_Handler.
+**Implementation anchors**:
+- Frame parser: `src/main/msp/msp_serial.c` → `mspSerialProcessReceivedData()`
+- V1 IDs: `src/main/msp/msp_protocol.h`
+- V2 BF IDs: `src/main/msp/msp_protocol_v2_betaflight.h`
+- V2 common: `src/main/msp/msp_protocol_v2_common.h`
+- Dispatcher: `src/main/msp/msp.c` → `mspCommonProcessOutCommand()` + `mspFcProcessOutCommand()`
+- DisplayPort driver: `src/main/io/displayport_msp.c`
+- CRSF tunnel: `src/main/telemetry/crsf.c` + `src/main/rx/crsf.c`
 
-**Ghidra setup**: `ARM:LE:32:Cortex`, base `0x08000000`, SVD-Loader for
-peripheral names.
+**Configurator JS lib**: `@betaflight/msp` (npm) — encodes/decodes V1+V2.
 
-**Binary patching escalation**: byte flips → veneers (Nexmon) → FPB live
-patches (6–8 HW comparators on Cortex-M3/M4/M7).
+### From Autoresearch #2 (STM32 Build & RE)
 
-**STM32 RDP**: L0 readable; L1 falls to ~$200 glitching (ChipWhisperer);
-L2 currently unbroken in public research.
+- Forward pipeline: preprocess → compile → link (`KEEP(*(.vectors))` puts
+  vector table at flash 0x08000000) → objcopy → flash.
+- Vector table: `+0x00` MSP, `+0x04` Reset_Handler. Thumb bit (LSB=1).
+- Dump: SWD (OpenOCD), USB DFU (`dfu-util`), UART (`stm32flash`).
+- Ghidra: `ARM:LE:32:Cortex`, base `0x08000000`, SVD-Loader.
+- RDP: L0 readable; L1 ~$200 glitch; L2 currently unbroken.
 
 ### From Autoresearch #1 (STM32F7x2 in Betaflight)
-- `STM32F7X2` unified-target covers F722RET6 (512 KB) and F722RGT6 (1 MB).
-- F4 / F7 capped at 4 motors for new BF designs; hex/octo requires H7.
-- **Cloud Build System** (BF 4.4+) drops unused drivers so 512 KB MCUs fit.
+- `STM32F7X2` covers F722RET6 (512K) and F722RGT6 (1M).
+- F4/F7 capped at 4 motors; hex/octo → H7.
+- Cloud Build System (4.4+) drops unused drivers for 512K MCUs.
 - F7 vs F4: 216 MHz M7 + L1 cache, HW UART inversion, more UARTs.
 
-### From Ingest #1 (MSP Autonomy)
-- **MSP Override Mode**: companion computer overrides RC via `MSP_SET_RAW_RC`.
-- **MSP v1 frame**: `$M` + dir + size + cmd + payload + XOR.
-
-### From Ingest #2 (7" Long-Range Class)
-- 7" cruiser: low KV 1100–1500, big stator, 6S2P Li-Ion, ELRS 915 MHz, GPS Rescue.
-- **Li-Ion**: flat discharge curve → use 3.1 V warn / 3.0 V min, NOT BF defaults.
-- **SmartAudio**: one-wire VTX control over UART TX.
+### From Ingest #3 (BF Getting Started Hardware)
+- FC block inventory: MCU + voltage regulator + OSD chip (MAX7456 analog
+  only) + IMU + baro + mag + GPS.
+- Voltage rails: 3.3 / 5 / 12 V — overloading 5V or 12V kills FCs.
+- BMI270 sampled at 3.2 kHz vs MPU6000 8 kHz.
+- BF 4.5+ auto-configures uBlox M10 GPS.
 
 ## Pages in the Vault
 
 ### Features
 - [[MSP Override Mode]]
 - [[SmartAudio]]
-- [[CRSF_BAUDRATE]] *(new — source-walk: define in rx/crsf_protocol.h, V3 runtime negotiation)*
+- [[CRSF_BAUDRATE]]
 
 ### Concepts
 - [[Companion Computer]]
@@ -118,21 +127,25 @@ L2 currently unbroken in public research.
 - [[ARM Cortex-M Firmware Build Process]]
 - [[Vector Table]]
 - [[Readout Protection (STM32 RDP)]]
-- [[Flight Controller Hardware]] *(new)*
-- [[OSD (On-Screen Display)]] *(new)*
-- [[Inertial Measurement Unit]] *(new)*
-- [[Barometer (Altitude Sensing)]] *(new)*
-- [[Magnetometer (Compass)]] *(new)*
-- [[GPS (Position Sensing)]] *(new)*
-- [[FC Voltage Rails]] *(new)*
-- [[Finding Defines in Firmware Binaries]] *(new — save from build-env Q&A)*
+- [[Flight Controller Hardware]]
+- [[OSD (On-Screen Display)]]
+- [[Inertial Measurement Unit]]
+- [[Barometer (Altitude Sensing)]]
+- [[Magnetometer (Compass)]]
+- [[GPS (Position Sensing)]]
+- [[FC Voltage Rails]]
+- [[Finding Defines in Firmware Binaries]]
+- **[[MSP v2 Frame Format]]** *(new)*
+- **[[MSP DisplayPort]]** *(new)*
+- **[[MSP API Versioning]]** *(new)*
+- **[[MSP over CRSF]]** *(new)*
 
 ### Reverse Engineering
-- [[MSP Protocol]]
+- [[MSP Protocol]] *(upgraded → documented; gaps resolved)*
 - [[Cortex-M Firmware Dumping]]
 - [[Loading Cortex-M Firmware in Ghidra]]
 - [[Cortex-M Binary Patching]]
-- [[Bin to Hex Conversion and Constant Patching]] *(new — end-to-end recipe: dump → find → patch → reflash, with CRSF_BAUDRATE worked example)*
+- [[Bin to Hex Conversion and Constant Patching]]
 
 ### Entities
 - [[Aocoda F460 Stack]]
@@ -140,53 +153,40 @@ L2 currently unbroken in public research.
 - [[ExpressLRS]]
 - [[STM32F722]]
 - [[STM32 MCU Family in Betaflight]]
-- [[MPU6000]] *(new)*
-- [[BMI270]] *(new)*
-- [[ICM-42688-P]] *(new)*
-- [[MAX7456]] *(new)*
-- [[BMP280]] *(new)*
-- [[uBlox GPS Module]] *(new)*
+- [[MPU6000]] / [[BMI270]] / [[ICM-42688-P]]
+- [[MAX7456]] / [[BMP280]] / [[uBlox GPS Module]]
 
 ### Thesis / Synthesis
 - [[Research - STM32F7x2 in Betaflight]]
 - [[Research - STM32 Firmware Build and Reverse Engineering]]
+- **[[Research - MSP Protocol Controlling Betaflight Firmware]]** *(new)*
 
 ## Open Questions / Gaps
 
-### From this ingest
-- **GPS Rescue** still has no dedicated page despite being referenced from
-  baro / mag / GPS / uBlox — promote from the "next steps" list.
-- Magnetometer integration status post-4.4.1: official doc still says
-  "not fully integrated in 4.4.1" — what changed in 4.5/4.6?
-- MSP DisplayPort details: how exactly does BF push OSD over UART to a
-  digital VTX? Frame format, repaint cadence?
-- Which BF version brought ICM-42xxx parity with MPU6000 — text says
-  "since 4.4.1" — is that the changelog entry?
-- Voltage-rail current ratings — is there a manufacturer-spec table
-  pattern we could harvest into [[FC Voltage Rails]]?
+### From this autoresearch
+- MSP-over-CRSF sequence/status byte layout (needs `crsf.c` source-walk).
+- `MSP_DEBUGMSG(253)` buffer size + flush semantics.
+- `MSP_MULTIPLE_MSP(230)` response framing — how sub-replies pack.
+- Digital VTX font mapping (bits 0-1 = font 0-3 — vendor-specific physical mapping).
+- MSP_REBOOT MSC variant — payload value and supported boards.
 
-### Carried over
-- Concrete BF binary RE walkthrough end-to-end (autoresearch #2).
-- BF bootloader behaviour (PA10 boot pad) vs STM32 ROM DFU.
-- Stored config CRC vs hex-edit safety.
-- Public Level-2 RDP bypass research status 2026.
-- `make/mcu/STM32F7.mk` direct view.
-- AT32F435 Configurator target string.
+### Carried over from prior sessions
+- GPS Rescue page (referenced 4 times, still missing).
+- Failsafe page.
 - BF version that introduced MSP Override Mode.
-- MSP v2 frame format (16-bit IDs).
-- SpeedyBee F405 V3 target name.
-- CRSF telemetry packet structure / MSP-over-CRSF.
+- Magnetometer integration status post-4.4.1.
 - SmartAudio v2.1 capability-table quirks.
+- AT32F435 Configurator target string.
+- STM32H743 entity page.
+- Public Level-2 RDP bypass research status 2026.
 
 ## Suggested Next Steps
 
-- Create **[[GPS Rescue]]** — now referenced from 4 new pages, biggest
-  remaining gap.
-- Create **[[Failsafe]]** — referenced from multiple pages.
-- Create **[[MSP DisplayPort]]** — the digital-VTX side of OSD.
-- Create **[[Betaflight Configurator]]** — Configurator OSD tab is the
-  obvious entry point.
-- Walk a BF binary through [[Loading Cortex-M Firmware in Ghidra]]
-  end-to-end.
-- Research STM32H743 entity page (mirror of [[STM32F722]]).
-- Research AT32F435 entity page (non-STM alternative).
+- Create **[[Betaflight Configurator]]** — the canonical MSP client, now
+  well-anchored by the new MSP pages.
+- Source-walk `src/main/telemetry/crsf.c` to close the MSP-over-CRSF
+  sequence-byte gap.
+- Create **[[GPS Rescue]]** and **[[Failsafe]]** — long-standing gaps.
+- Capture a live MSP trace from `betaflight_SITL.elf` (sitl/) and annotate
+  the handshake bytes against [[MSP API Versioning]].
+- Walk a BF binary through [[Loading Cortex-M Firmware in Ghidra]] end-to-end.
