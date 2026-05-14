@@ -1,0 +1,7 @@
+{
+	"nodes":[
+		{"id":"title","type":"text","text":"# Visual Reference\n\nDrop images, PDFs, and notes here.","x":-400,"y":-300,"width":400,"height":120,"color":"6"},
+		{"id":"zone-default","type":"group","label":"General","x":-400,"y":-140,"width":800,"height":400,"color":"4"}
+	],
+	"edges":[]
+}
