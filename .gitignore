@@ -80,7 +80,7 @@ Testing/
 /wikival/.DS_Store
 
 ## gits
-betaflight/
+betaflight*
 todo
 
 *.deb
